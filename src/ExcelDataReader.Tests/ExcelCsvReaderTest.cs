@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text;
 
 namespace ExcelDataReader.Tests;
@@ -23,6 +24,21 @@ public class ExcelCsvReaderTest
         Assert.That(ds.Tables[0].Rows[1][2], Is.EqualTo("120 any st."));
         Assert.That(ds.Tables[0].Rows[1][3], Is.EqualTo("Anytown, WW"));
         Assert.That(ds.Tables[0].Rows[1][4], Is.EqualTo("08123"));
+    }
+
+    [Test]
+    public void Issue443_DepthAlwaysZero_Csv()
+    {
+        using var reader = ExcelReaderFactory.CreateCsvReader(Configuration.GetTestWorkbook(Path.Combine("csv", "comma_in_quotes.csv")));
+        Assert.That(reader.Depth, Is.Zero);
+
+        Assert.That(reader.Read(), Is.True);
+        Assert.That(reader.Depth, Is.Zero);
+
+        while (reader.Read())
+        {
+            Assert.That(reader.Depth, Is.Zero);
+        }
     }
 
     [Test]
@@ -593,5 +609,21 @@ public class ExcelCsvReaderTest
         reader.GetValues(row);
 
         Assert.That(row, Is.EqualTo(new object[] { "John", "Doe", "120 any st.", "\"Anytown\", WW", "08123" }));
+    }
+
+    [Test]
+    public void FillMergedCellsValueDoesNotCrashOnCsv()
+    {
+        using var excelReader = ExcelReaderFactory.CreateCsvReader(Configuration.GetTestWorkbook(Path.Combine("csv", "comma_in_quotes.csv")));
+        DataSet result = excelReader.AsDataSet(new ExcelDataSetConfiguration
+        {
+            ConfigureDataTable = _ => new ExcelDataTableConfiguration
+            {
+                FillMergedCellsValue = true
+            }
+        });
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result.Tables[0].Rows.Count, Is.EqualTo(2));
     }
 }

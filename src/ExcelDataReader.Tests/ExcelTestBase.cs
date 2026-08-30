@@ -759,6 +759,27 @@ public abstract class ExcelTestBase
     }
 
     [Test]
+    public void Issue443_DepthAlwaysZero()
+    {
+        using IExcelDataReader reader = OpenReader("MultiSheet");
+        Assert.That(reader.Depth, Is.Zero);
+
+        Assert.That(reader.Read(), Is.True);
+        Assert.That(reader.Depth, Is.Zero);
+
+        while (reader.Read())
+        {
+            Assert.That(reader.Depth, Is.Zero);
+        }
+
+        Assert.That(reader.NextResult(), Is.True);
+        Assert.That(reader.Depth, Is.Zero);
+
+        Assert.That(reader.Read(), Is.True);
+        Assert.That(reader.Depth, Is.Zero);
+    }
+
+    [Test]
     public void UnicodeCharsTest()
     {
         using IExcelDataReader excelReader = OpenReader("UnicodeChars");
@@ -1036,7 +1057,8 @@ public abstract class ExcelTestBase
         
         Assert.That(reader.FieldCount, Is.GreaterThanOrEqualTo(10));
     }
-
+    
+    [Test]
     public void Issue541_BuiltinFormat55IsDate()
     {
         using var reader = OpenReader("Issue541");
@@ -1044,6 +1066,7 @@ public abstract class ExcelTestBase
         Assert.That(reader.GetValue(0), Is.EqualTo(new DateTime(2021, 1, 15)));
     }
 
+    [Test]
     public void AsDataSetTestFillEmptyCellsInMergedRangeNotUseHeaderRow()
     {
         using IExcelDataReader excelReader = OpenReader("MergedCell");
@@ -1096,6 +1119,24 @@ public abstract class ExcelTestBase
         Assert.That(result.Tables[0].Rows[3][0], Is.EqualTo("Merge Cell 3"));
         Assert.That(result.Tables[0].Rows[5][1], Is.EqualTo("Merge Cell 4"));
         Assert.That(result.Tables[0].Rows[5][2], Is.EqualTo("Merge Cell 4"));
+    }
+
+    [Test]
+    public void AsDataSetFillMergedCellsValueWithNoMergeCells()
+    {
+        using IExcelDataReader excelReader = OpenReader("10x10");
+        DataSet result = excelReader.AsDataSet(new ExcelDataSetConfiguration
+        {
+            ConfigureDataTable = _ => new ExcelDataTableConfiguration
+            {
+                UseHeaderRow = true,
+                FillMergedCellsValue = true
+            }
+        });
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result.Tables[0].Rows.Count, Is.EqualTo(9));
+        Assert.That(result.Tables[0].Columns.Count, Is.EqualTo(10));
     }
     
     protected IExcelDataReader OpenReader(string name)

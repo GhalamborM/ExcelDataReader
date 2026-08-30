@@ -207,18 +207,11 @@ public class ExcelBinaryReaderTest : ExcelTestBase
         Assert.That(dataSet.Tables[1].Rows[27][12], Is.EqualTo(78624.44));
     }
 
-    /// <summary>
-    /// Not fixed yet
-    /// The problem occurs with unseekable stream and logic related to minifat that uses seek
-    /// It should probably only use seek if it needs to go backwards, I think at the moment it uses seek all the time
-    /// which is probably not good for performance.
-    /// </summary>
     [Test]
-    [Ignore("Not fixed yet")]
     public void Issue1163911644_ForwardOnlyStream()
     {
         // Excel.Log.Log.InitializeWith<Log4NetLog>();
-        using var stream = Configuration.GetTestWorkbook("OpenOffice");
+        using var stream = Configuration.GetTestWorkbook("OpenOffice.xls");
         using var forwardStream = SeekErrorMemoryStream.CreateFromStream(stream);
         using IExcelDataReader excelReader = ExcelReaderFactory.CreateBinaryReader(forwardStream);
         Assert.DoesNotThrow(() => excelReader.AsDataSet());
@@ -357,6 +350,24 @@ public class ExcelBinaryReaderTest : ExcelTestBase
     }
 
     [Test]
+    public void AllowFeffAsByteOrder()
+    {
+        using var excelReader = ExcelReaderFactory.CreateBinaryReader(Configuration.GetTestWorkbook("Issue695_InvalidByteOrderFEFF.xls"));
+        int tableCount = 0;
+        do
+        {
+            while (excelReader.Read())
+            {
+            }
+
+            tableCount++;
+        }
+        while (excelReader.NextResult());
+
+        Assert.That(tableCount, Is.GreaterThan(0));
+    }
+
+    [Test]
     public void HandleRowBlocksWithOutOfOrderCells()
     {
         using var excelReader = ExcelReaderFactory.CreateBinaryReader(Configuration.GetTestWorkbook("AllColumnsNotReadInHiddenTable.xls"));
@@ -444,6 +455,54 @@ public class ExcelBinaryReaderTest : ExcelTestBase
         using var excelReader = ExcelReaderFactory.CreateBinaryReader(Configuration.GetTestWorkbook("Issue2.xls"));
         var ds = excelReader.AsDataSet();
         Assert.That(ds.Tables[0].Rows[0].ItemArray, Is.EqualTo(new[] { "A1", "B1" }));
+    }
+
+    [Test]
+    public void Issue753_BooleanOnlyXls_FieldCountIsDetected()
+    {
+        using var reader = ExcelReaderFactory.CreateBinaryReader(Configuration.GetTestWorkbook("issue753.xls"));
+
+        Assert.That(reader.Read(), Is.True);
+        Assert.That(reader.FieldCount, Is.EqualTo(4));
+
+        var boolCount = 0;
+        do
+        {
+            for (var col = 0; col < reader.FieldCount; col++)
+            {
+                if (reader.GetValue(col) is bool)
+                {
+                    boolCount++;
+                }
+            }
+        }
+        while (reader.Read());
+
+        Assert.That(boolCount, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void Issue753_BooleanOnlyXls_SinglePassMode_FieldCountAndValuesAreDetected()
+    {
+        using var reader = ExcelReaderFactory.CreateBinaryReader(
+            Configuration.GetTestWorkbook("issue753.xls"),
+            new ExcelReaderConfiguration { SinglePassMode = true });
+
+        Assert.That(reader.FieldCount, Is.Zero);
+        var boolCount = 0;
+        while (reader.Read())
+        {
+            for (var col = 0; col < reader.FieldCount; col++)
+            {
+                if (reader.GetValue(col) is bool)
+                {
+                    boolCount++;
+                }
+            }
+        }
+
+        Assert.That(reader.FieldCount, Is.EqualTo(4));
+        Assert.That(boolCount, Is.GreaterThan(0));
     }
 
     [TestCase]
